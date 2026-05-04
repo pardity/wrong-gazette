@@ -1,5 +1,6 @@
 .DS_Store
 .env
+ecosystem.config.cjs
 /node_modules/
 
 # React Router

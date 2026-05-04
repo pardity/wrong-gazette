@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import type { Route } from "./+types/home";
 import { initDb, getDb } from "~/db.server";
 import type { Entry } from "~/db.server";
-import { CHARACTER_MAP } from "~/ai.server";
+import { CHARACTER_MAP } from "~/characters";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await initDb();
