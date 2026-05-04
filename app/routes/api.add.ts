@@ -23,8 +23,8 @@ export async function action({ request }: Route.ActionArgs) {
   const ai = await categorizeEntry(text);
 
   await db.execute({
-    sql: "INSERT INTO entries (text, date, category, headline, verdict) VALUES (?, ?, ?, ?, ?)",
-    args: [text, date, ai.category, ai.headline, ai.verdict],
+    sql: "INSERT INTO entries (text, date, category, headline, verdict, character) VALUES (?, ?, ?, ?, ?, ?)",
+    args: [text, date, ai.category, ai.headline, ai.verdict, ai.character],
   });
 
   const inserted = await db.execute(

@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import type { Route } from "./+types/home";
 import { initDb, getDb } from "~/db.server";
 import type { Entry } from "~/db.server";
+import { CHARACTER_MAP } from "~/ai.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await initDb();
@@ -45,6 +46,43 @@ const CAT_COLORS: Record<string, { bg: string; text: string; border: string }> =
   "Classic Mike":                 { bg: "#f5f0e8", text: "#5c4a2a", border: "#8a7055" },
 };
 
+const CAT_NICKNAMES: Record<string, string> = {
+  "Dad Logic":                   "The Dad Decree",
+  "Saw It On Facebook":          "Zuckerberg Told Me",
+  "Heard It On The Radio":       "Rush Limbaugh's Ghost",
+  "Sports Expert (He's Not)":    "Armchair GM",
+  "Golf Nonsense":                "Fairway Fantasies",
+  "Pop Culture Fossil":           "1987 Called",
+  "Technology Confusion":         "Have You Tried Turning It Off",
+  "Financial Genius (He's Not)":  "Wolf of Wrong Street",
+  "History According To Mike":    "The Mike Smithson Version",
+  "Food Crime":                   "Gordon Ramsay's Nightmare",
+  "Classic Mike":                 "Pure Uncut Mike",
+};
+
+const TICKER_ITEMS = [
+  "BREAKING: MIKE SMITHSON WRONG AGAIN, SOURCES CONFIRM",
+  "MIKE DOUBLES DOWN ON INCORRECT STATEMENT",
+  "LOCAL MAN REFUSES TO GOOGLE IT",
+  "MIKE SMITHSON CONFIDENTLY INCORRECT FOR 3RD TIME THIS WEEK",
+  "EXPERTS BAFFLED: HOW DOES HE NOT KNOW THIS",
+  "MIKE SEEN ARGUING WITH A WIKIPEDIA PAGE",
+  "SOURCES: MIKE HAS NEVER BEEN RIGHT ABOUT SPORTS",
+  "MIKE SMITHSON INVENTS NEW FACTS, NATION MOURNS",
+  "UPDATE: MIKE STILL HASN'T APOLOGIZED",
+  "MIKE EXPLAINS THING HE CLEARLY DOESN'T UNDERSTAND",
+  "DEVELOPING: MIKE DOUBLES DOWN AGAIN",
+  "MIKE SMITHSON CITES 'A GUY HE KNOWS' AS SOURCE",
+  "WITNESS: MIKE SAID IT WITH A STRAIGHT FACE",
+  "MIKE SMITHSON WRONG ABOUT GOLF, AGAIN, STILL",
+  "REPORT: MIKE'S CONFIDENCE INVERSELY PROPORTIONAL TO ACCURACY",
+  "MIKE SMITHSON DISCOVERS FACEBOOK, WORLD SUFFERS",
+  "BREAKING: MIKE ARGUES WITH SOMEONE WHO ACTUALLY KNOWS",
+  "MIKE SMITHSON EXPLAINS HISTORY, HISTORIANS WEEP",
+  "LOCAL MAN CERTAIN THE REFS WERE WRONG",
+  "MIKE SMITHSON SEEN POINTING AT MENU LIKE AN EXPERT",
+];
+
 function getCatStyle(cat: string) {
   return CAT_COLORS[cat] ?? CAT_COLORS["Classic Mike"];
 }
@@ -85,7 +123,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
   const handleDonutClick = useCallback(async (id: string) => {
     const next = [...knockProgress, id];
-
     for (let i = 0; i < next.length; i++) {
       if (next[i] !== SECRET_COMBO[i]) {
         setKnockFlash("miss");
@@ -94,7 +131,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         return;
       }
     }
-
     if (next.length === SECRET_COMBO.length) {
       try {
         const res = await fetch("/api/token", {
@@ -204,6 +240,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   entries.forEach((e) => { if (e.category) catCounts[e.category] = (catCounts[e.category] ?? 0) + 1; });
   const topCat = Object.entries(catCounts).sort((a, b) => b[1] - a[1])[0]?.[0]?.split(" ")[0] ?? "—";
   const mikeIQ = Math.max(1, 100 - (entries.length * 3));
+  const maxCatCount = Math.max(1, ...Object.values(catCounts));
+  const tickerText = TICKER_ITEMS.join(" \u00a0•\u00a0 ");
 
   return (
     <div className="min-h-screen text-[#1a1008] flex flex-col" style={{ fontFamily: "'Bangers', cursive", background: "#fdf3e3" }}>
@@ -213,13 +251,32 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         .entry-card:nth-child(3n+1) { border-left-color: #e63900; }
         .entry-card:nth-child(3n+2) { border-left-color: #e68a00; }
         .entry-card:nth-child(3n+3) { border-left-color: #3355cc; }
-        @keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-        .ticker-inner { animation: ticker 28s linear infinite; }
+        .ticker-track {
+          display: flex;
+          width: max-content;
+          animation: ticker 60s linear infinite;
+        }
+        .ticker-segment { white-space: nowrap; padding-right: 60px; }
+        @keyframes ticker {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
         @keyframes flash-green { 0%,100% { background: #3a1f00; } 50% { background: #1a5c1a; } }
         @keyframes flash-red { 0%,100% { background: #3a1f00; } 50% { background: #5c1a1a; } }
         .flash-hit { animation: flash-green 0.8s ease; }
         .flash-miss { animation: flash-red 0.5s ease; }
         input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); }
+        .cloud-tag { transition: transform 0.15s, box-shadow 0.15s; }
+        .cloud-tag:hover { transform: scale(1.08); }
+        .cloud-tag.active { box-shadow: 0 0 0 3px #ffd500; }
+        .sticker {
+          position: absolute;
+          top: -14px;
+          right: 12px;
+          font-size: 32px;
+          line-height: 1;
+          filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.3));
+        }
       `}</style>
 
       {/* Header */}
@@ -268,19 +325,22 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         )}
 
         {unlocked && (
-          <button
-            onClick={lock}
-            className="absolute top-3 right-3 text-[#aaa] hover:text-[#ff69b4] text-xs bangers tracking-widest border border-[#555] px-2 py-1 rounded"
-          >
+          <button onClick={lock}
+            className="absolute top-3 right-3 text-[#aaa] hover:text-[#ff69b4] text-xs bangers tracking-widest border border-[#555] px-2 py-1 rounded">
             LOCK
           </button>
         )}
       </header>
 
       {/* Ticker */}
-      <div className="bg-[#ffd500] text-[#3a1f00] py-1.5 overflow-hidden border-b-4 border-[#cc2200]">
-        <div className="ticker-inner whitespace-nowrap inline-block bangers text-sm tracking-widest">
-          BREAKING: MIKE SMITHSON WRONG AGAIN, SOURCES CONFIRM &nbsp;•&nbsp; MIKE DOUBLES DOWN ON INCORRECT STATEMENT &nbsp;•&nbsp; LOCAL MAN REFUSES TO GOOGLE IT &nbsp;•&nbsp; MIKE SMITHSON CONFIDENTLY INCORRECT FOR 3RD TIME THIS WEEK &nbsp;•&nbsp; EXPERTS BAFFLED: HOW DOES HE NOT KNOW THIS &nbsp;•&nbsp; MIKE SEEN ARGUING WITH A WIKIPEDIA PAGE &nbsp;•&nbsp; SOURCES: MIKE HAS NEVER BEEN RIGHT ABOUT SPORTS &nbsp;•&nbsp; BREAKING: MIKE SMITHSON WRONG AGAIN, SOURCES CONFIRM &nbsp;•&nbsp; MIKE DOUBLES DOWN ON INCORRECT STATEMENT &nbsp;•&nbsp; LOCAL MAN REFUSES TO GOOGLE IT &nbsp;•&nbsp;
+      <div style={{ background: "#ffd500", borderBottom: "4px solid #cc2200", overflow: "hidden", padding: "6px 0" }}>
+        <div className="ticker-track">
+          <span className="ticker-segment bangers" style={{ fontSize: 13, letterSpacing: 2, color: "#3a1f00" }}>
+            {tickerText} &nbsp;•&nbsp;
+          </span>
+          <span className="ticker-segment bangers" style={{ fontSize: 13, letterSpacing: 2, color: "#3a1f00" }}>
+            {tickerText} &nbsp;•&nbsp;
+          </span>
         </div>
       </div>
 
@@ -370,6 +430,47 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           </div>
         )}
 
+        {/* Tag Cloud */}
+        {allCategories.length > 0 && (
+          <div className="mt-6 border-4 border-[#3a1f00] p-4 rounded-lg" style={{ background: "#fff8e7" }}>
+            <h3 className="bangers text-[#3a1f00] text-lg tracking-widest mb-3">MIKE'S HALL OF SHAME</h3>
+            <div className="flex flex-wrap gap-2">
+              {allCategories.map((cat) => {
+                const count = catCounts[cat] || 0;
+                const ratio = count / maxCatCount;
+                const fontSize = Math.round(11 + ratio * 10);
+                const style = getCatStyle(cat);
+                const nickname = CAT_NICKNAMES[cat] || cat;
+                const isActive = catFilter === cat;
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => { setCatFilter(isActive ? "" : cat); setPage(1); }}
+                    className={`cloud-tag patrick rounded-full border-2 px-3 py-1 cursor-pointer ${isActive ? "active" : ""}`}
+                    style={{
+                      background: style.bg,
+                      color: style.text,
+                      borderColor: style.border,
+                      fontSize: `${fontSize}px`,
+                      fontWeight: ratio > 0.6 ? "bold" : "normal",
+                    }}
+                  >
+                    {nickname} ({count})
+                  </button>
+                );
+              })}
+            </div>
+            {catFilter && (
+              <button
+                onClick={() => { setCatFilter(""); setPage(1); }}
+                className="mt-3 patrick text-xs text-[#cc2200] underline"
+              >
+                Clear filter
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Record */}
         <div className="mt-6">
           <h2 className="bangers text-3xl border-b-4 border-[#3a1f00] pb-1 mb-4 text-[#3a1f00]">
@@ -392,7 +493,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               style={{ fontFamily: "'Patrick Hand', cursive", background: "#fffdf5" }}
             >
               <option value="">All delusions</option>
-              {allCategories.map((c) => <option key={c} value={c}>{c}</option>)}
+              {allCategories.map((c) => <option key={c} value={c}>{CAT_NICKNAMES[c] || c}</option>)}
             </select>
             <select
               value={sortOrder}
@@ -416,17 +517,27 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             pageEntries.map((entry) => {
               const style = getCatStyle(entry.category);
               const displayNum = entries.length - entries.findIndex(e => e.id === entry.id);
+              const nickname = CAT_NICKNAMES[entry.category] || entry.category;
+              const character = entry.character ? CHARACTER_MAP[entry.character] : null;
               return (
-                <div key={entry.id} className="entry-card bg-white border-2 border-[#3a1f00] border-l-8 p-4 mb-4 rounded-lg">
+                <div key={entry.id} className="entry-card bg-white border-2 border-[#3a1f00] border-l-8 p-4 mb-6 rounded-lg relative" style={{ marginTop: "20px" }}>
+                  {character && (
+                    <div className="sticker" title={character.name}>
+                      {character.emoji}
+                    </div>
+                  )}
                   <div className="flex justify-between items-start gap-2 mb-2 flex-wrap">
                     <div className="flex gap-2 items-center flex-wrap">
                       <span className="bangers text-4xl text-[#ddd] leading-none mr-1">#{displayNum}</span>
-                      <span
-                        className="bangers text-xs tracking-widest px-2 py-0.5 rounded-full border-2"
-                        style={{ background: style.bg, color: style.text, borderColor: style.border }}
-                      >
-                        {entry.category}
-                      </span>
+                      <div>
+                        <span
+                          className="bangers text-xs tracking-widest px-2 py-0.5 rounded-full border-2 block"
+                          style={{ background: style.bg, color: style.text, borderColor: style.border }}
+                        >
+                          {nickname}
+                        </span>
+                        <span className="patrick text-[10px] text-[#aaa] block text-center">{entry.category}</span>
+                      </div>
                       <span className="patrick text-xs text-[#6b5e4a]">{formatDate(entry.date)}</span>
                     </div>
                     {unlocked && (
@@ -447,6 +558,13 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                       <p className="text-sm patrick text-[#6b5e4a] leading-relaxed">
                         <span className="text-[#cc2200] font-bold">The Verdict:</span> {entry.verdict}
                       </p>
+                    </div>
+                  )}
+                  {character && (
+                    <div className="mt-2 pt-2 border-t border-[#e0d5c0]">
+                      <span className="patrick text-[11px] text-[#aaa]">
+                        Vibes with: {character.emoji} {character.name}
+                      </span>
                     </div>
                   )}
                 </div>

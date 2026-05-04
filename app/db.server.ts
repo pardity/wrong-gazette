@@ -22,9 +22,16 @@ export async function initDb() {
       category TEXT,
       headline TEXT,
       verdict TEXT,
+      character TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     )
   `);
+  // Add character column if it doesn't exist on older databases
+  try {
+    await db.execute(`ALTER TABLE entries ADD COLUMN character TEXT`);
+  } catch {
+    // Column already exists, ignore
+  }
 }
 
 export interface Entry {
@@ -34,5 +41,6 @@ export interface Entry {
   category: string;
   headline: string;
   verdict: string;
+  character: string;
   created_at: string;
 }
